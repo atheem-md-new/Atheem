@@ -1,49 +1,33 @@
-const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
-const readline = require("readline")
+import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from "@whiskeysockets/baileys"
+import express from "express"
 
-// Function ya kusafisha namba
-function cleanNumber(number, countryCode = "255") {
-    let cleaned = number.replace(/\D/g, "") // ondoa vitu visivyo namba
+const app = express()
+const port = process.env.PORT || 3000
 
-    if (cleaned.startsWith("0")) {
-        cleaned = countryCode + cleaned.substring(1) // badilisha 0 mwanzo
-    } else if (!cleaned.startsWith(countryCode)) {
-        cleaned = countryCode + cleaned // ongeza countryCode kama haipo
-    }
-
-    return cleaned
-}
-
-// Kusoma namba ya simu kutoka terminal
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-})
-
-async function startBot() {
+app.get("/", async (req, res) => {
     const { state, saveCreds } = await useMultiFileAuthState("session")
-
+    const { version } = await fetchLatestBaileysVersion()
+    
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true
+        version
     })
 
-    // Hii inahakikisha creds zina-save
     sock.ev.on("creds.update", saveCreds)
 
-    rl.question("Ingiza namba ya simu yako (mfano: 0742233117 au 742233117 au 255742233117): ", (number) => {
-        const formattedNumber = cleanNumber(number)
-        console.log(`✅ Namba yako imebadilishwa kuwa: ${formattedNumber}`)
-        console.log("Sasa unaweza kutumia pairing code kwa namba hii...")
-
-        // Hapa unaweza kuweka function ya ku-generate pairing code kwa formattedNumber
-        // Mfano (kama unayo):
-        // sock.requestPairingCode(formattedNumber).then(code => {
-        //     console.log("Pairing Code:", code)
-        // })
-
-        rl.close()
+    sock.ev.on("connection.update", (update) => {
+        const { qr, pairingCode, connection } = update
+        
+        if (qr) {
+            res.send(`<h2>Scan QR hii kwa WhatsApp</h2><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qr}"/>`)
+        } else if (pairingCode) {
+            res.send(`<h2>Pairing Code: ${pairingCode}</h2>`)
+        } else if (connection === "open") {
+            res.send("<h2>✅ Bot imeunganishwa kikamilifu!</h2>")
+        }
     })
-}
+})
 
-startBot()
+app.listen(port, () => {
+    console.log(`Server inakimbia http://localhost:${port}`)
+})
