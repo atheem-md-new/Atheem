@@ -1,33 +1,42 @@
-import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from "@whiskeysockets/baileys"
-import express from "express"
+const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
 
-const app = express()
-const port = process.env.PORT || 3000
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState("./session");
 
-app.get("/", async (req, res) => {
-    const { state, saveCreds } = await useMultiFileAuthState("session")
-    const { version } = await fetchLatestBaileysVersion()
-    
-    const sock = makeWASocket({
-        auth: state,
-        version
-    })
+  const socket = makeWASocket({
+    auth: state,
+    printQRInTerminal: true,
+  });
 
-    sock.ev.on("creds.update", saveCreds)
+  socket.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", (update) => {
-        const { qr, pairingCode, connection } = update
-        
-        if (qr) {
-            res.send(`<h2>Scan QR hii kwa WhatsApp</h2><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qr}"/>`)
-        } else if (pairingCode) {
-            res.send(`<h2>Pairing Code: ${pairingCode}</h2>`)
-        } else if (connection === "open") {
-            res.send("<h2>✅ Bot imeunganishwa kikamilifu!</h2>")
-        }
-    })
-})
+  socket.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === "open") {
+      console.log("✅ Bot connected successfully!");
 
-app.listen(port, () => {
-    console.log(`Server inakimbia http://localhost:${port}`)
-})
+      // Hapa tunaweka notification message
+      await socket.sendMessage(socket.user.id, {
+        image: { url: "https://i.postimg.cc/90R1VDwP/IMG-20250730-WA0039-2.jpg" },
+        caption: `🚀 *WELCOME TO THE FUTURE – ATHEEM MD* 🚀
+
+🔐 *SESSION ID GENERATED SUCCESSFULLY*
+
+⚠️ *KEEP IT SAFE – NEVER SHARE WITH ANYONE!*
+✅ Use this Session ID ONLY to deploy your *ATHEEM MD* bot.
+
+🤖 You are now part of the *ATHEEM MD NETWORK*  
+Let the automation begin!
+
+━━━━━━━━━━━━━━━
+📢 *Official Channel:* https://whatsapp.com/channel/0029Vb3RbBsKbYMSx7LsBU24  
+💬 *Support Group:* https://chat.whatsapp.com/CBcA1YIkgDoICCbXMG2mt6?mode=ac_t
+━━━━━━━━━━━━━━━
+
+🔧 Powered by *ATHEEM MD  BOT SYSTEM*`,
+      });
+    }
+  });
+}
+
+startBot();
